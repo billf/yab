@@ -22,18 +22,28 @@ package main
 
 import (
 	"io/ioutil"
+	"path"
 	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
 type template struct {
-	Service string            `yaml:"service"`
-	Thrift  string            `yaml:"thrift"`
-	Method  string            `yaml:"method"`
-	Headers map[string]string `yaml:"headers"`
-	Request interface{}       `yaml:"request"`
-	Timeout time.Duration     `yaml:"timeout"`
+	Peers           []string          `yaml:"peers"`
+	Peer            string            `yaml:"peer"`
+	PeerList        string            `yaml:"peerlist"`
+	Caller          string            `yaml:"caller"`
+	Service         string            `yaml:"service"`
+	Thrift          string            `yaml:"thrift"`
+	Procedure       string            `yaml:"procedure"`
+	ShardKey        string            `yaml:"shardkey"`
+	RoutingKey      string            `yaml:"routingkey"`
+	RoutingDelegate string            `yaml:"routingdelegate"`
+	Headers         map[string]string `yaml:"headers"`
+	Baggage         map[string]string `yaml:"baggage"`
+	Jaeger          bool              `yaml:"jaeger"`
+	Request         interface{}       `yaml:"request"`
+	Timeout         time.Duration     `yaml:"timeout"`
 }
 
 func readYamlRequest(opts *Options) error {
@@ -54,15 +64,51 @@ func readYamlRequest(opts *Options) error {
 		return err
 	}
 
-	headers, err := yaml.Marshal(t.Headers)
-	if err != nil {
-		return err
+	if t.Peer != "" {
+		opts.TOpts.HostPorts = []string{t.Peer}
+	} else if t.Peers != nil {
+		opts.TOpts.HostPorts = t.Peers
+	} else if t.PeerList != "" {
+		opts.TOpts.HostPortFile = path.Join(path.Dir(opts.ROpts.YamlTemplate), t.PeerList)
+	}
+
+	// Header arguments have precedence over template headers.
+	if t.Headers != nil {
+		if opts.ROpts.Headers == nil {
+			opts.ROpts.Headers = t.Headers
+		} else {
+			for k, v := range t.Headers {
+				if _, exists := opts.ROpts.Headers[k]; !exists {
+					opts.ROpts.Headers[k] = v
+				}
+			}
+		}
+	}
+
+	if t.Jaeger {
+		opts.TOpts.Jaeger = true
+	}
+
+	// Baggage arguments have precedence over template headers.
+	if t.Baggage != nil {
+		if opts.ROpts.Baggage == nil {
+			opts.ROpts.Baggage = t.Baggage
+		} else {
+			for k, v := range t.Baggage {
+				if _, exists := opts.ROpts.Baggage[k]; !exists {
+					opts.ROpts.Baggage[k] = v
+				}
+			}
+		}
 	}
 
 	opts.ROpts.ThriftFile = t.Thrift
-	opts.ROpts.MethodName = t.Method
+	opts.TOpts.CallerName = t.Caller
 	opts.TOpts.ServiceName = t.Service
-	opts.ROpts.HeadersJSON = string(headers)
+	opts.ROpts.MethodName = t.Procedure
+	opts.TOpts.ShardKey = t.ShardKey
+	opts.TOpts.RoutingKey = t.RoutingKey
+	opts.TOpts.RoutingDelegate = t.RoutingDelegate
 	opts.ROpts.RequestJSON = string(body)
 	opts.ROpts.Timeout = timeMillisFlag(t.Timeout)
 

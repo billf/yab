@@ -1,5 +1,10 @@
 service: foo
 procedure: Simple::foo
+peer: 127.0.0.1:8080
+peers:
+- 127.0.0.1:8080
+- 127.0.0.1:8081
+peerlist: peers.json
 caller: bar
 shardkey: sk
 routingkey: rk

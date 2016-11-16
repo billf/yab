@@ -31,12 +31,51 @@ func TestTemplate(t *testing.T) {
 	opts := newOptions()
 	opts.ROpts.YamlTemplate = "testdata/templates/foo.yaml"
 
+	opts.ROpts.HeadersJSON = `{
+		"header2": "overridden",
+	}`
+	opts.ROpts.Headers = map[string]string{
+		"header2": "from Headers",
+		"header3": "from Headers",
+	}
+
 	readYamlRequest(opts)
+
+	headers, err := getHeaders(opts.ROpts.HeadersJSON, opts.ROpts.HeadersFile, opts.ROpts.Headers)
+	assert.NoError(t, err, "failed to merge headers")
 
 	assert.Equal(t, "testdata/templates/foo.thrift", opts.ROpts.ThriftFile)
 	assert.Equal(t, "Simple::foo", opts.ROpts.MethodName)
 	assert.Equal(t, "foo", opts.TOpts.ServiceName)
-	assert.Equal(t, "header1: value1\nheader2: value2\n", opts.ROpts.HeadersJSON)
+	assert.Equal(t, "bar", opts.TOpts.CallerName)
+	assert.Equal(t, "sk", opts.TOpts.ShardKey)
+	assert.Equal(t, "rk", opts.TOpts.RoutingKey)
+	assert.Equal(t, "rd", opts.TOpts.RoutingDelegate)
+	assert.Equal(t, "rd", opts.TOpts.RoutingDelegate)
+	assert.Equal(t, map[string]string{"header1": "from template", "header2": "from Headers", "header3": "from Headers"}, headers)
+	assert.Equal(t, map[string]string{"baggage1": "value1", "baggage2": "value2"}, opts.ROpts.Baggage)
+	assert.Equal(t, true, opts.TOpts.Jaeger)
 	assert.Equal(t, "location:\n  cityId: 1\n  latitude: 37.7\n  longitude: -122.4\n", opts.ROpts.RequestJSON)
 	assert.Equal(t, timeMillisFlag(4500*time.Millisecond), opts.ROpts.Timeout)
+}
+
+func TestPeerTemplate(t *testing.T) {
+	opts := newOptions()
+	opts.ROpts.YamlTemplate = "testdata/templates/peer.yaml"
+	readYamlRequest(opts)
+	assert.Equal(t, []string{"127.0.0.1:8080"}, opts.TOpts.HostPorts)
+}
+
+func TestPeersTemplate(t *testing.T) {
+	opts := newOptions()
+	opts.ROpts.YamlTemplate = "testdata/templates/peers.yaml"
+	readYamlRequest(opts)
+	assert.Equal(t, []string{"127.0.0.1:8080", "127.0.0.1:8081"}, opts.TOpts.HostPorts)
+}
+
+func TestPeerListTemplate(t *testing.T) {
+	opts := newOptions()
+	opts.ROpts.YamlTemplate = "testdata/templates/peerlist.yaml"
+	readYamlRequest(opts)
+	assert.Equal(t, "testdata/templates/peers.json", opts.TOpts.HostPortFile)
 }
